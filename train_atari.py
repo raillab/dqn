@@ -14,7 +14,7 @@ def parse_args():
     # Environment
     parser.add_argument("--env", type=str, default="PongNoFrameskip-v4", help="name of the game")
     # Core DQN parameters
-    parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
+    parser.add_argument("--replay-buffer-size", type=int, default=int(1e6), help="replay buffer size")
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
     parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
     parser.add_argument("--num-steps", type=int, default=int(1e6),
@@ -51,10 +51,10 @@ if __name__ == '__main__':
     env = EpisodicLifeEnv(env)
     env = FireResetEnv(env)
     env = WarpFrame(env)
+    env = PyTorchFrame(env)
     env = ScaledFloatFrame(env)
     env = ClipRewardEnv(env)
     env = FrameStack(env, 4)
-    env = PyTorchFrame(env)
 
     replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
         eps_threshold = args.eps_start + fraction * (args.eps_end - args.eps_start)
         sample = random.random()
         if sample > eps_threshold:
-            action = agent.act(state)
+            action = agent.act(np.array(state))
         else:
             action = env.action_space.sample()
 

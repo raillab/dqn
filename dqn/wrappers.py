@@ -142,7 +142,9 @@ class ClipRewardEnv(gym.RewardWrapper):
 
 class WarpFrame(gym.ObservationWrapper):
     def __init__(self, env):
-        """Warp frames to 84x84 as done in the Nature paper and later work."""
+        """Warp frames to 84x84 as done in the Nature paper and later work.
+        Expects inputs to be of shape height x width x num_channels
+        """
         gym.ObservationWrapper.__init__(self, env)
         self.width = 84
         self.height = 84
@@ -159,15 +161,13 @@ class FrameStack(gym.Wrapper):
     def __init__(self, env, k):
         """Stack k last frames.
         Returns lazy array, which is much more memory efficient.
-        See Also
-        --------
-        baselines.common.atari_wrappers.LazyFrames
+        Expects inputs to be of shape num_channels x height x width.
         """
         gym.Wrapper.__init__(self, env)
         self.k = k
         self.frames = deque([], maxlen=k)
         shp = env.observation_space.shape
-        self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0], shp[1], shp[2] * k), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0] * k, shp[1], shp[2]), dtype=np.uint8)
 
     def reset(self):
         ob = self.env.reset()
@@ -199,39 +199,29 @@ class LazyFrames(object):
     def __init__(self, frames):
         """This object ensures that common frames between the observations are only stored once.
         It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
-        buffers.
-        This object should only be converted to numpy array before being passed to the model.
-        You'd not believe how complex the previous solution was."""
+        buffers."""
         self._frames = frames
-        self._out = None
-
-    def _force(self):
-        if self._out is None:
-            self._out = np.concatenate(self._frames, axis=2)
-            self._frames = None
-        return self._out
 
     def __array__(self, dtype=None):
-        out = self._force()
+        out = np.concatenate(self._frames, axis=0)
         if dtype is not None:
             out = out.astype(dtype)
         return out
 
     def __len__(self):
-        return len(self._force())
+        return len(self._frames)
 
     def __getitem__(self, i):
-        return self._force()[i]
+        return self._frames[i]
 
 
 class PyTorchFrame(gym.ObservationWrapper):
-    """ Image shape to num_channels x weight x height """
+    """Image shape to num_channels x height x width"""
 
     def __init__(self, env):
         super(PyTorchFrame, self).__init__(env)
-        old_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]),
-                                                dtype=np.uint8)
+        shape = self.observation_space.shape
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(shape[-1], shape[0], shape[1]), dtype=np.uint8)
 
     def observation(self, observation):
-        return np.swapaxes(observation, 2, 0)
+        return np.rollaxis(observation, 2)

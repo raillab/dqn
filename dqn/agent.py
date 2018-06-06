@@ -43,10 +43,10 @@ class DQNAgent:
         :return: the loss
         """
         states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
-        states = torch.from_numpy(states).float().to(device)
+        states = torch.from_numpy(states).to(device)
         actions = torch.from_numpy(actions).long().to(device)
         rewards = torch.from_numpy(rewards).float().to(device)
-        next_states = torch.from_numpy(next_states).float().to(device)
+        next_states = torch.from_numpy(next_states).to(device)
         dones = torch.from_numpy(dones).float().to(device)
 
         with torch.no_grad():
@@ -62,6 +62,8 @@ class DQNAgent:
         self.optimiser.zero_grad()
         loss.backward()
         self.optimiser.step()
+        del states
+        del next_states
         return loss.item()
 
     def update_target_network(self):
@@ -70,14 +72,13 @@ class DQNAgent:
         """
         self.target_network.load_state_dict(self.policy_network.state_dict())
 
-    def act(self,
-            state: np.ndarray):
+    def act(self, state: np.ndarray):
         """
         Select an action greedily from the Q-network given the state
         :param state: the current state
         :return: the action to take
         """
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        state = torch.from_numpy(state).unsqueeze(0).to(device)
         with torch.no_grad():
             q_values = self.policy_network(state)
             _, action = q_values.max(1)
