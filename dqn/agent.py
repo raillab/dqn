@@ -15,6 +15,7 @@ class DQNAgent:
                  observation_space: spaces.Box,
                  action_space: spaces.Discrete,
                  replay_buffer: ReplayBuffer,
+                 use_double_dqn=True,
                  lr=1e-4,
                  batch_size=32,
                  gamma=0.99):
@@ -30,6 +31,7 @@ class DQNAgent:
 
         self.memory = replay_buffer
         self.batch_size = batch_size
+        self.use_double_dqn = use_double_dqn
         self.gamma = gamma
         self.policy_network = DQN(observation_space, action_space).to(device)
         self.target_network = DQN(observation_space, action_space).to(device)
@@ -43,15 +45,21 @@ class DQNAgent:
         :return: the loss
         """
         states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
-        states = torch.from_numpy(states).to(device)
+        states = np.array(states) / 255.0
+        next_states = np.array(next_states) / 255.0
+        states = torch.from_numpy(states).float().to(device)
         actions = torch.from_numpy(actions).long().to(device)
         rewards = torch.from_numpy(rewards).float().to(device)
-        next_states = torch.from_numpy(next_states).to(device)
+        next_states = torch.from_numpy(next_states).float().to(device)
         dones = torch.from_numpy(dones).float().to(device)
 
         with torch.no_grad():
-            next_q_values = self.target_network(next_states)
-            max_next_q_values, _ = next_q_values.max(1)
+            if self.use_double_dqn:
+                _, max_next_action = self.policy_network(next_states).max(1)
+                max_next_q_values = self.target_network(next_states).gather(1, max_next_action.unsqueeze(1)).squeeze()
+            else:
+                next_q_values = self.target_network(next_states)
+                max_next_q_values, _ = next_q_values.max(1)
             target_q_values = rewards + (1 - dones) * self.gamma * max_next_q_values
 
         input_q_values = self.policy_network(states)
@@ -78,7 +86,8 @@ class DQNAgent:
         :param state: the current state
         :return: the action to take
         """
-        state = torch.from_numpy(state).unsqueeze(0).to(device)
+        state = np.array(state) / 255.0
+        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
         with torch.no_grad():
             q_values = self.policy_network(state)
             _, action = q_values.max(1)

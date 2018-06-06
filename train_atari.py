@@ -25,6 +25,7 @@ def parse_args():
                         help="number of iterations between every optimization step")
     parser.add_argument("--target-update-freq", type=int, default=1000,
                         help="number of iterations between every target network update")
+    parser.add_argument("--use-double-dqn", type=bool, default=True, help="use double deep Q-learning")
     # e-greedy exploration parameters
     parser.add_argument("--eps-start", type=float, default=1.0, help="e-greedy start threshold")
     parser.add_argument("--eps-end", type=float, default=0.02, help="e-greedy end threshold")
@@ -52,7 +53,6 @@ if __name__ == '__main__':
     env = FireResetEnv(env)
     env = WarpFrame(env)
     env = PyTorchFrame(env)
-    env = ScaledFloatFrame(env)
     env = ClipRewardEnv(env)
     env = FrameStack(env, 4)
 
@@ -62,6 +62,7 @@ if __name__ == '__main__':
         env.observation_space,
         env.action_space,
         replay_buffer,
+        use_double_dqn=args.use_double_dqn,
         lr=args.lr,
         batch_size=args.batch_size,
         gamma=args.gamma
